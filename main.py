@@ -1,15 +1,14 @@
 import os
 import asyncio
 from datetime import datetime
-from pyrogram import Client, filters, enums
+from pyrogram import Client, filters
 from pyrogram.errors import SessionPasswordNeeded
 
-# --- البيانات الأساسية ---
+# --- البيانات الأساسية للبوت ---
 API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
 
-# --- بوت التليجرام الرئيسي ---
 bot = Client(
     None,
     api_id=API_ID,
@@ -18,14 +17,11 @@ bot = Client(
     in_memory=True
 )
 
-# --- متغيرات البوت ---
 user_steps = {}
 log_channels = {}
 spam_status = {}
 auto_reply_config = {}
-
-# --- تحديد عدد العملاء المتزامنين لتجنب ضغط السيرفر ---
-client_limiter = asyncio.Semaphore(100)  # يمكن زيادة الرقم حسب قوة السيرفر
+client_limiter = asyncio.Semaphore(150)  # عدد العملاء المتزامنين
 
 # --- دالة تشغيل العميل لكل مستخدم ---
 async def start_user_logic(session_string, user_id):
@@ -38,7 +34,7 @@ async def start_user_logic(session_string, user_id):
             in_memory=True
         )
 
-        # 1. أوامر التحكم بالرد التلقائي
+        # 1. أوامر الرد التلقائي
         @user_client.on_message(filters.me & filters.regex(r"^\.تفعيل رد تلقائي (.+)"))
         async def enable_reply(client, message):
             reply_text = message.matches[0].group(1)
@@ -51,27 +47,24 @@ async def start_user_logic(session_string, user_id):
                 auto_reply_config[user_id]["active"] = False
             await message.edit("❌ تم تعطيل الرد التلقائي.")
 
-        # 2. أمر ضبط قناة التخزين
+        # 2. ضبط قناة التخزين
         @user_client.on_message(filters.me & filters.regex(r"^\.ضبط قناة تخزين"))
         async def set_log_channel(client, message):
             log_channels[user_id] = message.chat.id
             await message.edit("تم حبيبي اي شي يصير يجيك هنا")
 
-        # 3. معالج الرسائل الخاصة
+        # 3. تسجيل الرسائل الخاصة
         @user_client.on_message(filters.private & ~filters.me)
         async def logger_and_reply(client, message):
             config = auto_reply_config.get(user_id)
             if config and config.get("active"):
-                try: 
-                    await message.reply(config["text"])
-                except: 
-                    pass
-            
+                try: await message.reply(config["text"])
+                except: pass
+
             if user_id in log_channels:
                 log_id = log_channels[user_id]
                 now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
                 username = f"@{message.from_user.username}" if message.from_user.username else "ماعنده يوزر"
-                
                 info_text = (
                     f"⚠️ **اكو واحد دز شي**\n"
                     f"👤 **الي رسلها:** {message.from_user.mention}\n"
@@ -81,7 +74,6 @@ async def start_user_logic(session_string, user_id):
                     f"⬇️ **رسالته جوة مباشرة:**"
                 )
                 await client.send_message(log_id, info_text)
-
                 try:
                     if message.media:
                         file_path = await client.download_media(message)
@@ -93,7 +85,7 @@ async def start_user_logic(session_string, user_id):
                     await client.send_message(log_id, f"صارت مشكلة على حظك")
                 await client.send_message(log_id, "───────")
 
-        # 4. أوامر السبام
+        # 4. سبام
         @user_client.on_message(filters.me & filters.regex(r"^\.سبام (.+)"))
         async def start_spam(client, message):
             chat_id = message.chat.id
@@ -113,67 +105,104 @@ async def start_user_logic(session_string, user_id):
         await user_client.start()
 
 
-# --- واجهة تسجيل الدخول ---
+# --- واجهة بدء البوت ---
 @bot.on_message(filters.command("start") & filters.private)
 async def start_cmd(client, message):
-    await message.reply("هلاو حبيبي احبنك لان استخدمت البوت مالي ارسلي رقمك مثل هيج +964xxxxxxxxxxx")
+    await message.reply(
+        "هلاو حبيبي 😎 اختر الطريقة:\n"
+        "1️⃣ أرسل 'رقم' لاستخدام رقم الهاتف\n"
+        "2️⃣ أرسل 'سيزون' لاستخدام Session String"
+    )
+    user_steps[message.chat.id] = {"step": "choose_method"}
 
 
 @bot.on_message(filters.text & filters.private)
 async def flow_handler(client, message):
     chat_id = message.chat.id
-    welcome_msg = (
-        "✅ **تم التفعيل روح تونس هذني الاوامر:**\n\n"
-        "1️⃣ `.تفعيل رد تلقائي (الكلمة)` و `.تعطيل رد تلقائي`\n"
-        "2️⃣ `.سبام (الكلمة)` و `.كافي سبام`\n"
-        "3️⃣ `.ضبط قناة تخزين` (لمشاهدة المحذوفات والموقوت)\n\n"
-        "⚠️ *ملاحظة: اشتركوا بقناة التحديثات: https://t.me/UPSASOURCE"
-    )
+    text = message.text.strip().lower()
 
-    if message.text.startswith("+"):
-        temp_client = Client(
-            None,
-            api_id=API_ID,
-            api_hash=API_HASH,
-            in_memory=True
-        )
-        await temp_client.connect()
-        try:
-            code_info = await temp_client.send_code(message.text)
-            user_steps[chat_id] = {
-                "client": temp_client,
-                "phone": message.text,
-                "hash": code_info.phone_code_hash,
-                "step": "code"
-            }
-            await message.reply("ارسلي كود التحقق الي اجاك بليز 👉🏻👈🏻")
-        except Exception:
-            await message.reply("خطا")
-    elif chat_id in user_steps and user_steps[chat_id]["step"] == "code":
-        data = user_steps[chat_id]
-        try:
-            await data["client"].sign_in(data["phone"], data["hash"], message.text.replace(" ", ""))
-            session = await data["client"].export_session_string()
-            await data["client"].disconnect()
-            asyncio.create_task(start_user_logic(session, chat_id))
-            await message.reply(welcome_msg)
+    if chat_id in user_steps:
+
+        step = user_steps[chat_id]["step"]
+
+        # --- اختيار طريقة التسجيل ---
+        if step == "choose_method":
+            if text == "رقم":
+                user_steps[chat_id]["step"] = "phone"
+                await message.reply("تمام 😎، أرسل رقمك بصيغة +964xxxxxxxxxxx")
+            elif text == "سيزون":
+                user_steps[chat_id]["step"] = "session"
+                await message.reply("تمام 😎، أرسل API_ID")
+            else:
+                await message.reply("أرسل 'رقم' أو 'سيزون' فقط.")
+
+        # --- خطوات رقم الهاتف ---
+        elif step == "phone":
+            temp_client = Client(None, api_id=API_ID, api_hash=API_HASH, in_memory=True)
+            await temp_client.connect()
+            try:
+                code_info = await temp_client.send_code(message.text)
+                user_steps[chat_id] = {
+                    "client": temp_client,
+                    "phone": message.text,
+                    "hash": code_info.phone_code_hash,
+                    "step": "code"
+                }
+                await message.reply("👌 تمام، أرسل كود التحقق الذي وصلك.")
+            except:
+                await message.reply("خطأ، تحقق من الرقم وحاول مرة ثانية.")
+
+        elif step == "code":
+            data = user_steps[chat_id]
+            try:
+                await data["client"].sign_in(data["phone"], data["hash"], message.text.replace(" ", ""))
+                session = await data["client"].export_session_string()
+                await data["client"].disconnect()
+                asyncio.create_task(start_user_logic(session, chat_id))
+                await message.reply("✅ تم التفعيل بنجاح، استمتع بالأوامر!")
+                del user_steps[chat_id]
+            except SessionPasswordNeeded:
+                user_steps[chat_id]["step"] = "pass"
+                await message.reply("أرسل كلمة المرور لحسابك.")
+            except:
+                await message.reply("خطأ أثناء تسجيل الدخول، حاول مرة ثانية.")
+
+        elif step == "pass":
+            data = user_steps[chat_id]
+            try:
+                await data["client"].check_password(message.text)
+                session = await data["client"].export_session_string()
+                await data["client"].disconnect()
+                asyncio.create_task(start_user_logic(session, chat_id))
+                await message.reply("✅ تم التفعيل بنجاح، استمتع بالأوامر!")
+                del user_steps[chat_id]
+            except:
+                await message.reply("خطأ في كلمة المرور، حاول مرة ثانية.")
+
+        # --- خطوات Session String ---
+        elif step == "session":
+            user_steps[chat_id]["step"] = "session_api"
+            user_steps[chat_id]["session_data"] = {"session_string": message.text}
+            await message.reply("👌 الآن أرسل API_HASH")
+
+        elif step == "session_api":
+            user_steps[chat_id]["session_data"]["api_hash"] = message.text
+            user_steps[chat_id]["step"] = "session_id"
+            await message.reply("👌 الآن أرسل API_ID")
+
+        elif step == "session_id":
+            session_data = user_steps[chat_id]["session_data"]
+            user_steps[chat_id]["step"] = None
+            session_client = Client(
+                None,
+                api_id=int(message.text),
+                api_hash=session_data["api_hash"],
+                session_string=session_data["session_string"],
+                in_memory=True
+            )
+            asyncio.create_task(start_user_logic(session_data["session_string"], chat_id))
+            await message.reply("✅ تم التفعيل بالـ Session String بنجاح!")
             del user_steps[chat_id]
-        except SessionPasswordNeeded:
-            user_steps[chat_id]["step"] = "pass"
-            await message.reply("ارسلي مالتك الباسورد ياحلو 😜")
-        except Exception:
-            await message.reply("عندك خطا")
-    elif chat_id in user_steps and user_steps[chat_id]["step"] == "pass":
-        data = user_steps[chat_id]
-        try:
-            await data["client"].check_password(message.text)
-            session = await data["client"].export_session_string()
-            await data["client"].disconnect()
-            asyncio.create_task(start_user_logic(session, chat_id))
-            await message.reply(welcome_msg)
-            del user_steps[chat_id]
-        except Exception:
-            await message.reply("صار خطا")
 
 
 print("🚀 البوت يعمل الآن بنظام الذاكرة المطلق...")
