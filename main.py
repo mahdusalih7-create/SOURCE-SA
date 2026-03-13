@@ -9,7 +9,14 @@ API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
 
-bot = Client("maloloihsahjsbdjgerooo_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# تصحيح: إضافة in_memory لمنع قفل قاعدة البيانات في Railway
+bot = Client(
+    "malolo_manager_bot", 
+    api_id=API_ID, 
+    api_hash=API_HASH, 
+    bot_token=BOT_TOKEN,
+    in_memory=True
+)
 
 user_steps = {}
 log_channels = {} 
@@ -17,7 +24,14 @@ spam_status = {}
 auto_reply_config = {} 
 
 async def start_user_logic(session_string, user_id):
-    user_client = Client(f"user_{user_id}", api_id=API_ID, api_hash=API_HASH, session_string=session_string)
+    # تصحيح: استخدام in_memory واستخدام string session مباشرة لمنع إنشاء ملفات sqlite
+    user_client = Client(
+        name=f"session_{user_id}", 
+        api_id=API_ID, 
+        api_hash=API_HASH, 
+        session_string=session_string,
+        in_memory=True
+    )
 
     # 1. أوامر التحكم بالرد التلقائي
     @user_client.on_message(filters.me & filters.regex(r"^\.تفعيل رد تلقائي (.+)"))
@@ -81,7 +95,7 @@ async def start_user_logic(session_string, user_id):
         await message.delete()
         while spam_status.get((user_id, chat_id)):
             await client.send_message(chat_id, text_to_spam)
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.6) # تم زيادة التأخير قليلاً لتجنب حظر التليجرام
 
     @user_client.on_message(filters.me & filters.text)
     async def stop_spam(client, message):
@@ -108,6 +122,7 @@ async def flow_handler(client, message):
     )
 
     if message.text.startswith("+"):
+        # تصحيح: استخدام :memory: يمنع إنشاء ملف sqlite مؤقت يسبب قفل القاعدة
         temp_client = Client(":memory:", api_id=API_ID, api_hash=API_HASH)
         await temp_client.connect()
         try:
@@ -137,5 +152,5 @@ async def flow_handler(client, message):
             del user_steps[chat_id]
         except Exception: await message.reply("صار خطا")
 
-print("🚀 البوت يعمل الآن...")
+print("🚀 البوت يعمل الآن بنظام الذاكرة الآمن...")
 bot.run()
