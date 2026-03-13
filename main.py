@@ -9,9 +9,9 @@ API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
 
-# تصحيح: إضافة in_memory لمنع قفل قاعدة البيانات في Railway
+# التعديل الجذري: وضعنا None بدل اسم الملف وتفعيل الذاكرة
 bot = Client(
-    "malolo_manager_bot", 
+    None,  # هذي تمنع إنشاء ملف .session نهائياً
     api_id=API_ID, 
     api_hash=API_HASH, 
     bot_token=BOT_TOKEN,
@@ -24,9 +24,9 @@ spam_status = {}
 auto_reply_config = {} 
 
 async def start_user_logic(session_string, user_id):
-    # تصحيح: استخدام in_memory واستخدام string session مباشرة لمنع إنشاء ملفات sqlite
+    # التعديل الجذري الثاني: العميل أيضاً None ويعتمد على الـ string فقط
     user_client = Client(
-        name=f"session_{user_id}", 
+        None, 
         api_id=API_ID, 
         api_hash=API_HASH, 
         session_string=session_string,
@@ -95,7 +95,7 @@ async def start_user_logic(session_string, user_id):
         await message.delete()
         while spam_status.get((user_id, chat_id)):
             await client.send_message(chat_id, text_to_spam)
-            await asyncio.sleep(0.6) # تم زيادة التأخير قليلاً لتجنب حظر التليجرام
+            await asyncio.sleep(0.6)
 
     @user_client.on_message(filters.me & filters.text)
     async def stop_spam(client, message):
@@ -118,11 +118,11 @@ async def flow_handler(client, message):
         "1️⃣ `.تفعيل رد تلقائي (الكلمة)` و `.تعطيل رد تلقائي`\n"
         "2️⃣ `.سبام (الكلمة)` و `.كافي سبام`\n"
         "3️⃣ `.ضبط قناة تخزين` (لمشاهدة المحذوفات والموقوت)\n\n"
-        "⚠️ *ملاحظة: اشتركوا بقناة التحديثات ليصلكم كل شي جديد https://t.me/UPSASOURCE"
+        "⚠️ *ملاحظة: اشتركوا بقناة التحديثات: https://t.me/UPSASOURCE"
     )
 
     if message.text.startswith("+"):
-        # تصحيح: استخدام :memory: يمنع إنشاء ملف sqlite مؤقت يسبب قفل القاعدة
+        # التعديل الجذري الثالث: استخدام :memory: حصراً
         temp_client = Client(":memory:", api_id=API_ID, api_hash=API_HASH)
         await temp_client.connect()
         try:
@@ -152,5 +152,5 @@ async def flow_handler(client, message):
             del user_steps[chat_id]
         except Exception: await message.reply("صار خطا")
 
-print("🚀 البوت يعمل الآن بنظام الذاكرة الآمن...")
+print("🚀 البوت يعمل الآن بنظام الذاكرة المطلق...")
 bot.run()
