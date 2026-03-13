@@ -9,9 +9,9 @@ API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
 
-# التعديل الجذري: وضعنا None بدل اسم الملف وتفعيل الذاكرة
+# البوت الرئيسي - بدون اسم ملف ومع تفعيل الذاكرة
 bot = Client(
-    None,  # هذي تمنع إنشاء ملف .session نهائياً
+    name=None, 
     api_id=API_ID, 
     api_hash=API_HASH, 
     bot_token=BOT_TOKEN,
@@ -24,16 +24,15 @@ spam_status = {}
 auto_reply_config = {} 
 
 async def start_user_logic(session_string, user_id):
-    # التعديل الجذري الثاني: العميل أيضاً None ويعتمد على الـ string فقط
+    # حساب المستخدم - بدون اسم ملف ومع تفعيل الذاكرة
     user_client = Client(
-        None, 
+        name=None, 
         api_id=API_ID, 
         api_hash=API_HASH, 
         session_string=session_string,
         in_memory=True
     )
 
-    # 1. أوامر التحكم بالرد التلقائي
     @user_client.on_message(filters.me & filters.regex(r"^\.تفعيل رد تلقائي (.+)"))
     async def enable_reply(client, message):
         reply_text = message.matches[0].group(1)
@@ -46,13 +45,11 @@ async def start_user_logic(session_string, user_id):
             auto_reply_config[user_id]["active"] = False
         await message.edit("❌ تم تعطيل الرد التلقائي.")
 
-    # 2. أمر ضبط قناة التخزين
     @user_client.on_message(filters.me & filters.regex(r"^\.ضبط قناة تخزين"))
     async def set_log_channel(client, message):
         log_channels[user_id] = message.chat.id
         await message.edit("تم حبيبي اي شي يصير يجيك هنا")
 
-    # 3. معالج الرسائل الخاصة
     @user_client.on_message(filters.private & ~filters.me)
     async def logger_and_reply(client, message):
         config = auto_reply_config.get(user_id)
@@ -86,7 +83,6 @@ async def start_user_logic(session_string, user_id):
                 await client.send_message(log_id, f"صارت مشكلة على حظك")
             await client.send_message(log_id, "───────")
 
-    # 4. أوامر السبام
     @user_client.on_message(filters.me & filters.regex(r"^\.سبام (.+)"))
     async def start_spam(client, message):
         chat_id = message.chat.id
@@ -105,7 +101,6 @@ async def start_user_logic(session_string, user_id):
 
     await user_client.start()
 
-# --- واجهة تسجيل الدخول ---
 @bot.on_message(filters.command("start") & filters.private)
 async def start_cmd(client, message):
     await message.reply("هلاو حبيبي احبنك لان استخدمت البوت مالي ارسلي رقمك مثل هيج +964xxxxxxxxxxx")
@@ -122,14 +117,15 @@ async def flow_handler(client, message):
     )
 
     if message.text.startswith("+"):
-        # التعديل الجذري الثالث: استخدام :memory: حصراً
-        temp_client = Client(":memory:", api_id=API_ID, api_hash=API_HASH)
+        # التعديل الأهم: العميل المؤقت يجب أن يكون None و in_memory=True
+        temp_client = Client(name=None, api_id=API_ID, api_hash=API_HASH, in_memory=True)
         await temp_client.connect()
         try:
             code_info = await temp_client.send_code(message.text)
             user_steps[chat_id] = {"client": temp_client, "phone": message.text, "hash": code_info.phone_code_hash, "step": "code"}
             await message.reply("ارسلي كود التحقق الي اجاك بليز 👉🏻👈🏻")
-        except Exception: await message.reply("خطا")
+        except Exception: await message.reply("خطا في ارسال الكود")
+        
     elif chat_id in user_steps and user_steps[chat_id]["step"] == "code":
         data = user_steps[chat_id]
         try:
@@ -141,7 +137,8 @@ async def flow_handler(client, message):
         except SessionPasswordNeeded:
             user_steps[chat_id]["step"] = "pass"
             await message.reply("ارسلي مالتك الباسورد ياحلو 😜")
-        except Exception: await message.reply("عندك خطا")
+        except Exception: await message.reply("الكود غلط او منتهي")
+        
     elif chat_id in user_steps and user_steps[chat_id]["step"] == "pass":
         data = user_steps[chat_id]
         try:
@@ -150,7 +147,7 @@ async def flow_handler(client, message):
             asyncio.create_task(start_user_logic(session, chat_id))
             await message.reply(welcome_msg)
             del user_steps[chat_id]
-        except Exception: await message.reply("صار خطا")
+        except Exception: await message.reply("الباسورد غلط")
 
-print("🚀 البوت يعمل الآن بنظام الذاكرة المطلق...")
+print("🚀 البوت يعمل الآن بنظام الرام الصافي (بدون داتابيز)...")
 bot.run()
