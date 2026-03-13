@@ -25,7 +25,7 @@ spam_status = {}
 auto_reply_config = {}
 
 # --- تحديد عدد العملاء المتزامنين لتجنب ضغط السيرفر ---
-client_limiter = asyncio.Semaphore(100)  # يمكن تغيير الرقم حسب قوة السيرفر
+client_limiter = asyncio.Semaphore(100)  # يمكن زيادة الرقم حسب قوة السيرفر
 
 # --- دالة تشغيل العميل لكل مستخدم ---
 async def start_user_logic(session_string, user_id):
@@ -35,8 +35,7 @@ async def start_user_logic(session_string, user_id):
             api_id=API_ID,
             api_hash=API_HASH,
             session_string=session_string,
-            in_memory=True,
-            sqlite_timeout=30
+            in_memory=True
         )
 
         # 1. أوامر التحكم بالرد التلقائي
@@ -136,8 +135,7 @@ async def flow_handler(client, message):
             None,
             api_id=API_ID,
             api_hash=API_HASH,
-            in_memory=True,
-            sqlite_timeout=30
+            in_memory=True
         )
         await temp_client.connect()
         try:
