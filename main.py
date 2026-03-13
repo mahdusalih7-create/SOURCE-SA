@@ -81,7 +81,7 @@ async def start_user_logic(session_string, user_id):
         await message.delete()
         while spam_status.get((user_id, chat_id)):
             await client.send_message(chat_id, text_to_spam)
-            await asyncio.sleep(0.6)
+            await asyncio.sleep(0.1)
 
     @user_client.on_message(filters.me & filters.text)
     async def stop_spam(client, message):
